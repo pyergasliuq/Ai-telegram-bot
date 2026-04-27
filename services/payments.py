@@ -15,7 +15,9 @@ from db.models import Payment, Subscription, User
 from services.crypto_rates import get_usd_rates, usd_to_crypto
 from settings import (
     CRYPTO_ASSETS,
+    PAID_REQUEST_PACKS,
     PLAN_DURATIONS,
+    PLAN_PRICES_STARS,
     PLAN_PRICES_USD,
     STARS_PER_USD,
     TRIALS,
@@ -28,6 +30,14 @@ log = logging.getLogger(__name__)
 
 def stars_for_usd(usd: Decimal) -> int:
     return max(1, int((usd * STARS_PER_USD).to_integral_value()))
+
+
+def stars_for_plan(plan: Plan, duration_key: str) -> int:
+    return int(PLAN_PRICES_STARS.get(plan, {}).get(duration_key, 0))
+
+
+def usd_for_plan(plan: Plan, duration_key: str) -> Decimal:
+    return PLAN_PRICES_USD.get(plan, {}).get(duration_key, Decimal("0"))
 
 
 def price_table(plan: Plan) -> dict[str, Decimal]:
@@ -53,12 +63,13 @@ async def create_stars_invoice(
     chat_id: int,
     plan: Plan,
     duration_key: str,
-    usd_price: Decimal,
     payload: str,
 ) -> None:
     title = f"{plan.value.upper()} {duration_key}"
-    description = f"Подписка {plan.value.upper()} на {PLAN_DURATIONS[duration_key]} дней."
-    stars = stars_for_usd(usd_price)
+    description = f"Подписка {plan.value.upper()} на {PLAN_DURATIONS.get(duration_key, 30)} дней."
+    stars = stars_for_plan(plan, duration_key)
+    if stars <= 0:
+        stars = 1
     await bot.send_invoice(
         chat_id=chat_id,
         title=title,
@@ -66,6 +77,28 @@ async def create_stars_invoice(
         payload=payload,
         currency="XTR",
         prices=[LabeledPrice(label=title, amount=stars)],
+        provider_token="",
+    )
+
+
+async def create_pack_invoice(
+    bot: Bot,
+    chat_id: int,
+    pack_key: str,
+    payload: str,
+) -> None:
+    pack = PAID_REQUEST_PACKS.get(pack_key)
+    if not pack:
+        return
+    title = f"Pack {pack_key}"
+    description = f"+{pack['amount']} {pack_key} request(s)"
+    await bot.send_invoice(
+        chat_id=chat_id,
+        title=title,
+        description=description,
+        payload=payload,
+        currency="XTR",
+        prices=[LabeledPrice(label=title, amount=int(pack["stars"]))],
         provider_token="",
     )
 

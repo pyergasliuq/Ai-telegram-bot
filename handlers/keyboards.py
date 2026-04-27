@@ -11,6 +11,7 @@ from core.i18n import t
 from settings import (
     PLAN_DURATIONS,
     PLAN_FEATURES,
+    PLAN_PRICES_STARS,
     WORK_CATEGORIES,
     Mood,
     Plan,
@@ -130,7 +131,10 @@ def stage_kb(lang: str, plan: Plan) -> InlineKeyboardMarkup:
 def plans_kb(lang: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for p in (Plan.PLUS, Plan.PRO, Plan.MAX):
-        rows.append([InlineKeyboardButton(text=t(lang, f"plan.{p.value}"), callback_data=f"plan:{p.value}")])
+        stars = PLAN_PRICES_STARS.get(p, {}).get("1m", 0)
+        label = f"{t(lang, f'plan.{p.value}')} — {stars}⭐/мес"
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"plan:{p.value}")])
+    rows.append([InlineKeyboardButton(text=t(lang, "buy.title"), callback_data="buy:packs")])
     rows.append([InlineKeyboardButton(text=t(lang, "billing.trial.title"), callback_data="trial:menu")])
     rows.append([InlineKeyboardButton(text=t(lang, "menu.main"), callback_data="nav:main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -138,8 +142,11 @@ def plans_kb(lang: str) -> InlineKeyboardMarkup:
 
 def durations_kb(lang: str, plan: Plan) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
+    table = PLAN_PRICES_STARS.get(plan, {})
     for key in PLAN_DURATIONS:
-        rows.append([InlineKeyboardButton(text=key, callback_data=f"dur:{plan.value}:{key}")])
+        stars = table.get(key, 0)
+        label = f"{key} — {stars}⭐"
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"dur:{plan.value}:{key}")])
     rows.append([InlineKeyboardButton(text=t(lang, "menu.back"), callback_data="nav:billing")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

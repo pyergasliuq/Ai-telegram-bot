@@ -38,6 +38,9 @@ class User(Base):
     referred_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
 
     bonus_text_requests: Mapped[int] = mapped_column(Integer, default=0)
+    bonus_image_requests: Mapped[int] = mapped_column(Integer, default=0)
+    bonus_voice_requests: Mapped[int] = mapped_column(Integer, default=0)
+    bonus_coursework_requests: Mapped[int] = mapped_column(Integer, default=0)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     is_muted: Mapped[bool] = mapped_column(Boolean, default=False)
     channels_verified: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -104,6 +107,8 @@ class DailyQuota(Base):
     voice_limit: Mapped[int] = mapped_column(Integer, default=0)
     stt_used: Mapped[int] = mapped_column(Integer, default=0)
     stt_limit: Mapped[int] = mapped_column(Integer, default=0)
+    coursework_used: Mapped[int] = mapped_column(Integer, default=0)
+    coursework_limit: Mapped[int] = mapped_column(Integer, default=0)
 
     user: Mapped[User] = relationship(back_populates="quotas")
 

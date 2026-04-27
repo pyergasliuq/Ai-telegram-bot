@@ -25,16 +25,18 @@ from handlers.keyboards import (
 )
 from services.payments import (
     activate_subscription,
+    create_pack_invoice,
     create_stars_invoice,
     create_trial_invoice,
     crypto_bot,
     crypto_equivalents,
     format_crypto_line,
     has_active_subscription,
-    stars_for_usd,
+    stars_for_plan,
 )
 from services.promo import PromoError, already_used, apply_discount, find_active
 from settings import (
+    PAID_REQUEST_PACKS,
     PLAN_DURATIONS,
     PLAN_PRICES_USD,
     TRIALS,
@@ -64,9 +66,9 @@ async def show_methods(cq: CallbackQuery, lang: str) -> None:
     _, plan_str, dur = cq.data.split(":")
     plan = Plan(plan_str)
     usd = PLAN_PRICES_USD[plan][dur]
+    stars = stars_for_plan(plan, dur)
     eq = await crypto_equivalents(usd)
     crypto_line = format_crypto_line(eq)
-    stars = stars_for_usd(usd)
     line = t(
         lang,
         "billing.price_line",
@@ -100,6 +102,7 @@ async def pay_stars(cq: CallbackQuery, session: AsyncSession, user: User, lang: 
     _, _, plan_str, dur = cq.data.split(":")
     plan = Plan(plan_str)
     usd = PLAN_PRICES_USD[plan][dur]
+    stars = stars_for_plan(plan, dur)
     pending_code = (user.settings_data or {}).get("pending_promo")
     discount_promo = None
     if pending_code:
@@ -121,14 +124,14 @@ async def pay_stars(cq: CallbackQuery, session: AsyncSession, user: User, lang: 
         method="stars",
         asset=None,
         amount_usd=float(usd),
-        amount_native=str(stars_for_usd(usd)),
+        amount_native=str(stars),
         status="pending",
         invoice_id=payload,
         extra={"promo": discount_promo} if discount_promo else {},
     )
     session.add(payment)
     await session.flush()
-    await create_stars_invoice(cq.bot, cq.message.chat.id, plan, dur, usd, payload)
+    await create_stars_invoice(cq.bot, cq.message.chat.id, plan, dur, payload)
     await cq.message.answer(t(lang, "billing.invoice_sent"))
     await cq.answer()
 
@@ -238,10 +241,85 @@ async def precheckout(pcq: PreCheckoutQuery) -> None:
     await pcq.bot.answer_pre_checkout_query(pcq.id, ok=True)
 
 
+@router.callback_query(F.data == "buy:packs")
+async def show_packs(cq: CallbackQuery, lang: str) -> None:
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    rows: list[list[InlineKeyboardButton]] = []
+    for key, pack in PAID_REQUEST_PACKS.items():
+        label = t(
+            lang,
+            f"buy.pack.{key}",
+            stars=pack["stars"],
+            amount=pack["amount"],
+        )
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"buy:pack:{key}")])
+    rows.append([InlineKeyboardButton(text=t(lang, "menu.back"), callback_data="menu:main")])
+    await cq.message.edit_text(
+        t(lang, "buy.title"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+    )
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("buy:pack:"))
+async def buy_pack(cq: CallbackQuery, session: AsyncSession, user: User, lang: str) -> None:
+    pack_key = cq.data.rsplit(":", 1)[1]
+    pack = PAID_REQUEST_PACKS.get(pack_key)
+    if not pack:
+        await cq.answer()
+        return
+    payload = json.dumps(
+        {"m": "pack", "k": pack_key, "u": user.telegram_id},
+        separators=(",", ":"),
+    )
+    payment = Payment(
+        user_id=user.id,
+        plan="pack",
+        duration_key=pack_key,
+        method="stars",
+        asset=None,
+        amount_usd=0.0,
+        amount_native=str(pack["stars"]),
+        status="pending",
+        invoice_id=payload,
+        extra={"pack": pack_key, "amount": pack["amount"]},
+    )
+    session.add(payment)
+    await session.flush()
+    await create_pack_invoice(cq.bot, cq.message.chat.id, pack_key, payload)
+    await cq.message.answer(t(lang, "billing.invoice_sent"))
+    await cq.answer()
+
+
 @router.message(F.successful_payment)
 async def successful_payment(message: Message, session: AsyncSession, user: User, lang: str) -> None:
     sp: SuccessfulPayment = message.successful_payment  # type: ignore[assignment]
     payload = _parse_payload(sp.invoice_payload or "")
+    if payload.get("m") == "pack":
+        pack_key = payload.get("k", "")
+        pack = PAID_REQUEST_PACKS.get(pack_key)
+        if pack:
+            kind = pack["kind"]
+            amount = int(pack["amount"])
+            if kind == "text":
+                user.bonus_text_requests = (user.bonus_text_requests or 0) + amount
+            elif kind == "image":
+                user.bonus_image_requests = (user.bonus_image_requests or 0) + amount
+            elif kind == "voice":
+                user.bonus_voice_requests = (user.bonus_voice_requests or 0) + amount
+            elif kind == "coursework":
+                user.bonus_coursework_requests = (user.bonus_coursework_requests or 0) + amount
+            await session.flush()
+            await session.execute(
+                Payment.__table__.update()
+                .where(Payment.invoice_id == (sp.invoice_payload or ""))
+                .values(status="paid", updated_at=datetime.utcnow())
+            )
+            await message.answer(
+                t(lang, "buy.pack.success", kind=kind, amount=amount)
+            )
+        return
     plan_str = payload.get("p")
     dur = payload.get("d", "")
     is_trial = bool(payload.get("t"))

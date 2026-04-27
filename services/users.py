@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import DailyQuota, Referral, User
-from settings import PLAN_LIMITS, Plan
+from settings import COURSEWORK_DAILY_LIMIT, PLAN_LIMITS, Plan
 
 
 def _gen_ref_code() -> str:
@@ -89,6 +89,7 @@ async def get_or_init_quota(session: AsyncSession, user: User, today: date | Non
     q = (await session.execute(stmt)).scalar_one_or_none()
     plan = await current_plan(user)
     limits = PLAN_LIMITS[plan]
+    coursework_limit = COURSEWORK_DAILY_LIMIT if plan == Plan.MAX else 0
     if q is None:
         q = DailyQuota(
             user_id=user.id,
@@ -101,6 +102,8 @@ async def get_or_init_quota(session: AsyncSession, user: User, today: date | Non
             voice_limit=limits["tts"],
             stt_used=0,
             stt_limit=limits["stt"],
+            coursework_used=0,
+            coursework_limit=coursework_limit,
         )
         session.add(q)
         await session.flush()
@@ -109,6 +112,7 @@ async def get_or_init_quota(session: AsyncSession, user: User, today: date | Non
         q.img_limit = limits["images"]
         q.voice_limit = limits["tts"]
         q.stt_limit = limits["stt"]
+        q.coursework_limit = coursework_limit
     return q
 
 
@@ -128,18 +132,39 @@ async def consume_text(session: AsyncSession, user: User) -> bool:
 
 async def consume_image(session: AsyncSession, user: User) -> bool:
     q = await get_or_init_quota(session, user)
-    if q.img_used >= q.img_limit:
+    extra = user.bonus_image_requests or 0
+    if q.img_used >= q.img_limit and extra <= 0:
         return False
-    q.img_used += 1
+    if q.img_used < q.img_limit:
+        q.img_used += 1
+    else:
+        user.bonus_image_requests = max(0, extra - 1)
     await session.flush()
     return True
 
 
 async def consume_voice(session: AsyncSession, user: User) -> bool:
     q = await get_or_init_quota(session, user)
-    if q.voice_used >= q.voice_limit:
+    extra = user.bonus_voice_requests or 0
+    if q.voice_used >= q.voice_limit and extra <= 0:
         return False
-    q.voice_used += 1
+    if q.voice_used < q.voice_limit:
+        q.voice_used += 1
+    else:
+        user.bonus_voice_requests = max(0, extra - 1)
+    await session.flush()
+    return True
+
+
+async def consume_coursework(session: AsyncSession, user: User) -> bool:
+    q = await get_or_init_quota(session, user)
+    extra = user.bonus_coursework_requests or 0
+    if q.coursework_used >= q.coursework_limit and extra <= 0:
+        return False
+    if q.coursework_used < q.coursework_limit:
+        q.coursework_used += 1
+    else:
+        user.bonus_coursework_requests = max(0, extra - 1)
     await session.flush()
     return True
 

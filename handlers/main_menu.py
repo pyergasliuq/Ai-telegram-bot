@@ -29,8 +29,10 @@ async def _send_main(message: Message, session: AsyncSession, user: User, lang: 
         username=user.full_name or user.username or "",
         plan_name=_plan_name(lang, plan),
         text_left=max(0, quota.text_limit - quota.text_used) + (user.bonus_text_requests or 0),
-        img_left=max(0, quota.img_limit - quota.img_used),
-        voice_left=max(0, quota.voice_limit - quota.voice_used),
+        img_left=max(0, quota.img_limit - quota.img_used) + (user.bonus_image_requests or 0),
+        voice_left=max(0, quota.voice_limit - quota.voice_used) + (user.bonus_voice_requests or 0),
+        coursework_left=max(0, quota.coursework_limit - quota.coursework_used)
+        + (user.bonus_coursework_requests or 0),
     )
     await message.answer(
         text,
