@@ -110,6 +110,17 @@ async def _try_call(
     return await func(client, payload, model)
 
 
+def _cooldown_for_error(err: Exception) -> int:
+    msg = str(err)
+    if "401" in msg or "403" in msg or "402" in msg or "missing api key" in msg:
+        return settings.PROVIDER_AUTH_COOLDOWN_S
+    if "404" in msg or "not implemented" in msg:
+        return settings.PROVIDER_NOT_FOUND_COOLDOWN_S
+    if "429" in msg or "rate limit" in msg.lower():
+        return settings.PROVIDER_RATE_LIMIT_COOLDOWN_S
+    return settings.PROVIDER_COOLDOWN_S
+
+
 async def chat(
     ctx: RouteContext,
     messages: list[ChatMessage],
@@ -143,12 +154,12 @@ async def chat(
         except ProviderError as e:
             last_err = e
             log.warning("provider %s model %s failed: %s", provider, model, e)
-            provider_health.mark_failure(provider, model, settings.PROVIDER_COOLDOWN_S)
+            provider_health.mark_failure(provider, model, _cooldown_for_error(e))
             continue
         except Exception as e:
             last_err = e
             log.exception("unexpected error in %s/%s", provider, model)
-            provider_health.mark_failure(provider, model, settings.PROVIDER_COOLDOWN_S)
+            provider_health.mark_failure(provider, model, _cooldown_for_error(e))
             continue
     raise AllProvidersFailed(str(last_err) if last_err else "all providers exhausted")
 
@@ -177,11 +188,11 @@ async def image(
         except ProviderError as e:
             last_err = e
             log.warning("image provider %s/%s failed: %s", provider, model, e)
-            provider_health.mark_failure(provider, model, settings.PROVIDER_COOLDOWN_S)
+            provider_health.mark_failure(provider, model, _cooldown_for_error(e))
             continue
         except Exception as e:
             last_err = e
             log.exception("image unexpected error %s/%s", provider, model)
-            provider_health.mark_failure(provider, model, settings.PROVIDER_COOLDOWN_S)
+            provider_health.mark_failure(provider, model, _cooldown_for_error(e))
             continue
     raise AllProvidersFailed(str(last_err) if last_err else "no image providers available")

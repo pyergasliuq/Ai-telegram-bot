@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.i18n import t
 from db.models import User
-from handlers.keyboards import main_menu_kb
+from handlers.admin import is_admin
+from handlers.keyboards import admin_menu_kb, main_menu_kb
 from services.channels import all_member, list_active
 from services.users import current_plan, get_or_init_quota
 from settings import Plan
@@ -31,7 +32,10 @@ async def _send_main(message: Message, session: AsyncSession, user: User, lang: 
         img_left=max(0, quota.img_limit - quota.img_used),
         voice_left=max(0, quota.voice_limit - quota.voice_used),
     )
-    await message.answer(text, reply_markup=main_menu_kb(lang))
+    await message.answer(
+        text,
+        reply_markup=main_menu_kb(lang, is_admin=is_admin(user.telegram_id)),
+    )
 
 
 @router.message(CommandStart(deep_link=True))
@@ -88,6 +92,13 @@ async def open_work(message: Message, lang: str) -> None:
 @router.message(F.text.in_({"Помощь / FAQ", "Help / FAQ"}))
 async def help_text(message: Message, lang: str) -> None:
     await message.answer(t(lang, "help.text"))
+
+
+@router.message(F.text.in_({"Админ", "Admin", "🛠 Админ", "🛠 Admin"}))
+async def open_admin_panel(message: Message, user: User, lang: str) -> None:
+    if not is_admin(user.telegram_id):
+        return
+    await message.answer(t(lang, "admin.menu"), reply_markup=admin_menu_kb(lang))
 
 
 @router.message(F.text.in_({"Настройки", "Settings"}))
