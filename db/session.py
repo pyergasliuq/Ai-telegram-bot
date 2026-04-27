@@ -57,8 +57,24 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             raise
 
 
+_PG_COLUMN_PATCHES: tuple[tuple[str, str, str], ...] = (
+    ("users", "bonus_image_requests", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "bonus_voice_requests", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "bonus_coursework_requests", "INTEGER NOT NULL DEFAULT 0"),
+    ("daily_quotas", "coursework_used", "INTEGER NOT NULL DEFAULT 0"),
+    ("daily_quotas", "coursework_limit", "INTEGER NOT NULL DEFAULT 0"),
+)
+
+
 async def init_db() -> None:
+    from sqlalchemy import text
+
     from db import models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if conn.dialect.name == "postgresql":
+            for table, column, ddl in _PG_COLUMN_PATCHES:
+                await conn.execute(
+                    text(f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {ddl}')
+                )

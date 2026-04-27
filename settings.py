@@ -261,29 +261,36 @@ PLAN_DURATIONS: dict[str, int] = {
 }
 
 
-PLAN_PRICES_USD: dict[Plan, dict[str, Decimal]] = {
-    Plan.PLUS: {
-        "1w": Decimal("1.99"),
-        "2w": Decimal("3.49"),
-        "1m": Decimal("5.99"),
-        "3m": Decimal("14.99"),
-    },
-    Plan.PRO: {
-        "1w": Decimal("4.99"),
-        "2w": Decimal("8.99"),
-        "1m": Decimal("14.99"),
-        "3m": Decimal("39.99"),
-    },
-    Plan.MAX: {
-        "1w": Decimal("9.99"),
-        "2w": Decimal("17.99"),
-        "1m": Decimal("29.99"),
-        "3m": Decimal("79.99"),
-    },
+PLAN_PRICES_STARS: dict[Plan, dict[str, int]] = {
+    Plan.PLUS: {"1w": 14, "2w": 28, "1m": 50, "3m": 140},
+    Plan.PRO: {"1w": 28, "2w": 56, "1m": 100, "3m": 280},
+    Plan.MAX: {"1w": 70, "2w": 140, "1m": 250, "3m": 700},
 }
 
 
 STARS_PER_USD: int = 75
+
+
+def _stars_to_usd(stars: int) -> Decimal:
+    return (Decimal(stars) / Decimal(STARS_PER_USD)).quantize(Decimal("0.01"))
+
+
+PLAN_PRICES_USD: dict[Plan, dict[str, Decimal]] = {
+    plan: {dur: _stars_to_usd(stars) for dur, stars in table.items()}
+    for plan, table in PLAN_PRICES_STARS.items()
+}
+
+
+PAID_REQUEST_PACKS: dict[str, dict[str, Any]] = {
+    "text": {"stars": 1, "amount": 10, "kind": "text"},
+    "image": {"stars": 1, "amount": 1, "kind": "image"},
+    "voice": {"stars": 1, "amount": 1, "kind": "voice"},
+    "coursework": {"stars": 10, "amount": 1, "kind": "coursework"},
+}
+
+
+COURSEWORK_DAILY_LIMIT: int = 1
+COURSEWORK_PACK_STARS: int = PAID_REQUEST_PACKS["coursework"]["stars"]
 
 
 TRIALS: dict[Plan, dict[str, int]] = {
@@ -629,56 +636,61 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     },
     Plan.PRO: {
         TaskType.TEXT_GENERAL: [
-            _m("openai", "gpt-5-mini"),
-            _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("vertex", "gemini-4-pro"),
-            _m("google", "gemini-2.5-pro"),
-            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
-            _m("openrouter", "qwen/qwen3-235b-a22b:free"),
-            _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
             _m("groq", "llama-3.3-70b-versatile"),
             _m("cerebras", "gpt-oss-120b"),
+            _m("onlysq", "gpt-4o-mini"),
+            _m("openrouter", "qwen/qwen3-235b-a22b:free"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
+            _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
+            _m("google", "gemini-2.5-pro"),
             _m("onlysq", "gpt-4o"),
+            _m("openai", "gpt-5-mini"),
+            _m("vertex", "gemini-4-pro"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
         ],
         TaskType.TEXT_REASONING: [
-            _m("openai", "gpt-5"),
-            _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("vertex", "gemini-4-pro"),
-            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
+            _m("groq", "openai/gpt-oss-120b"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
-            _m("google", "gemini-3-pro"),
             _m("onlysq", "deepseek-r1"),
             _m("fireworks", "accounts/fireworks/models/deepseek-r1"),
             _m("sambanova", "DeepSeek-V3-0324"),
+            _m("google", "gemini-3-pro"),
+            _m("vertex", "gemini-4-pro"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("openai", "gpt-5"),
         ],
         TaskType.CODE: [
+            _m("groq", "openai/gpt-oss-120b"),
+            _m("openrouter", "qwen/qwen3-coder:free"),
+            _m("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
+            _m("onlysq", "gpt-4o-mini"),
+            _m("onlysq", "gpt-4o"),
             _m("openai", "gpt-5"),
             _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("openrouter", "qwen/qwen3-coder:free"),
-            _m("groq", "openai/gpt-oss-120b"),
-            _m("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
-            _m("onlysq", "gpt-4o"),
         ],
         TaskType.SUMMARIZER: [
-            _m("anthropic", "claude-3-5-haiku-latest"),
             _m("groq", "llama-3.1-8b-instant"),
             _m("google", "gemma-4-31b"),
             _m("cerebras", "llama3.1-8b"),
+            _m("anthropic", "claude-3-5-haiku-latest"),
         ],
         TaskType.SEARCH: [
-            _m("perplexity", "sonar-pro"),
-            _m("perplexity", "sonar-reasoning-pro"),
-            _m("onlysq", "sonar-reasoning-pro"),
-            _m("openrouter", "perplexity/sonar-reasoning"),
             _m("openrouter", "moonshotai/kimi-k2.5:free"),
             _m("openrouter", "moonshotai/kimi-k2:free"),
+            _m("openrouter", "perplexity/sonar-reasoning"),
+            _m("onlysq", "sonar-reasoning-pro"),
+            _m("perplexity", "sonar-pro"),
+            _m("perplexity", "sonar-reasoning-pro"),
         ],
         TaskType.IMAGE: [
-            _m("openai", "dall-e-3"),
-            _m("google", "gemini-2.5-flash-image"),
-            _m("onlysq", "flux-dev"),
             _m("cloudflare", "@cf/black-forest-labs/flux-1-schnell"),
+            _m("together", "black-forest-labs/FLUX.1-schnell-Free"),
+            _m("onlysq", "flux-schnell"),
+            _m("onlysq", "flux-dev"),
+            _m("google", "gemini-2.5-flash-image"),
+            _m("openai", "dall-e-3"),
         ],
         TaskType.STT: [
             _m("openai", "whisper-1"),
@@ -701,60 +713,69 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     },
     Plan.MAX: {
         TaskType.TEXT_GENERAL: [
-            _m("vertex", "gemini-4-ultra"),
-            _m("openai", "gpt-5"),
-            _m("anthropic", "claude-3-5-opus-latest"),
-            _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("vertex", "gemini-4-pro"),
-            _m("google", "gemini-4-pro"),
+            _m("groq", "llama-3.3-70b-versatile"),
+            _m("cerebras", "gpt-oss-120b"),
+            _m("onlysq", "gpt-4o-mini"),
+            _m("openrouter", "qwen/qwen3-235b-a22b:free"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
+            _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
             _m("google", "gemini-3-pro"),
+            _m("google", "gemini-4-pro"),
+            _m("onlysq", "gpt-4o"),
             _m("onlysq", "gpt-5"),
             _m("onlysq", "claude-sonnet-4"),
-            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
-            _m("openrouter", "qwen/qwen3-235b-a22b:free"),
-            _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
+            _m("vertex", "gemini-4-pro"),
+            _m("vertex", "gemini-4-ultra"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("anthropic", "claude-3-5-opus-latest"),
+            _m("openai", "gpt-5"),
         ],
         TaskType.TEXT_REASONING: [
-            _m("vertex", "gemini-4-ultra"),
-            _m("openai", "gpt-5"),
-            _m("anthropic", "claude-3-5-opus-latest"),
-            _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("onlysq", "gpt-5"),
-            _m("onlysq", "claude-sonnet-4"),
-            _m("onlysq", "deepseek-r1"),
-            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
+            _m("groq", "openai/gpt-oss-120b"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
-            _m("google", "gemini-4-pro"),
+            _m("onlysq", "deepseek-r1"),
             _m("fireworks", "accounts/fireworks/models/deepseek-r1"),
+            _m("google", "gemini-4-pro"),
+            _m("onlysq", "claude-sonnet-4"),
+            _m("onlysq", "gpt-5"),
+            _m("vertex", "gemini-4-ultra"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("anthropic", "claude-3-5-opus-latest"),
+            _m("openai", "gpt-5"),
         ],
         TaskType.CODE: [
-            _m("openai", "gpt-5"),
-            _m("anthropic", "claude-3-5-sonnet-latest"),
-            _m("onlysq", "gpt-5"),
-            _m("onlysq", "claude-sonnet-4"),
-            _m("openrouter", "qwen/qwen3-coder:free"),
             _m("groq", "openai/gpt-oss-120b"),
+            _m("openrouter", "qwen/qwen3-coder:free"),
+            _m("onlysq", "gpt-4o-mini"),
+            _m("onlysq", "gpt-4o"),
+            _m("onlysq", "claude-sonnet-4"),
+            _m("onlysq", "gpt-5"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("openai", "gpt-5"),
         ],
         TaskType.SUMMARIZER: [
-            _m("anthropic", "claude-3-5-haiku-latest"),
-            _m("google", "gemma-4-31b"),
             _m("groq", "llama-3.1-8b-instant"),
+            _m("google", "gemma-4-31b"),
             _m("cerebras", "llama3.1-8b"),
+            _m("anthropic", "claude-3-5-haiku-latest"),
         ],
         TaskType.SEARCH: [
-            _m("perplexity", "sonar-deep-research"),
-            _m("perplexity", "sonar-reasoning-pro"),
-            _m("perplexity", "sonar-pro"),
-            _m("onlysq", "sonar-reasoning-pro"),
-            _m("openrouter", "perplexity/sonar-reasoning"),
             _m("openrouter", "moonshotai/kimi-k2.5:free"),
+            _m("openrouter", "perplexity/sonar-reasoning"),
+            _m("onlysq", "sonar-reasoning-pro"),
+            _m("perplexity", "sonar-pro"),
+            _m("perplexity", "sonar-reasoning-pro"),
+            _m("perplexity", "sonar-deep-research"),
         ],
         TaskType.IMAGE: [
-            _m("openai", "dall-e-3"),
-            _m("google", "gemini-2.5-flash-image"),
-            _m("onlysq", "flux-dev"),
+            _m("cloudflare", "@cf/black-forest-labs/flux-1-schnell"),
             _m("together", "black-forest-labs/FLUX.1-schnell-Free"),
+            _m("onlysq", "flux-schnell"),
+            _m("onlysq", "flux-dev"),
+            _m("google", "gemini-2.5-flash-image"),
+            _m("openai", "dall-e-3"),
         ],
         TaskType.STT: [
             _m("openai", "whisper-1"),
@@ -861,15 +882,19 @@ WORK_CATEGORIES: list[dict[str, Any]] = [
 
 __all__ = [
     "ANTISPAM",
+    "COURSEWORK_DAILY_LIMIT",
+    "COURSEWORK_PACK_STARS",
     "CRYPTO_ASSETS",
     "CRYPTO_RATE_TTL_S",
     "FREE_TIER_PROVIDERS",
     "MODEL_REGISTRY",
     "MOOD_PROMPTS",
+    "PAID_REQUEST_PACKS",
     "PAID_TIER_PROVIDERS",
     "PLAN_DURATIONS",
     "PLAN_FEATURES",
     "PLAN_LIMITS",
+    "PLAN_PRICES_STARS",
     "PLAN_PRICES_USD",
     "PLAN_PROVIDER_ACCESS",
     "PROMO_DISCOUNT_MAX",

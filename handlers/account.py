@@ -32,11 +32,15 @@ async def open_account(message: Message, session: AsyncSession, user: User, lang
         f"{t(lang, 'account.referrals')}: {stats['total']}",
         f"{t(lang, 'account.paid_referrals')}: {stats['paid']}",
         f"{t(lang, 'account.bonus_text')}: {user.bonus_text_requests or 0}",
+        f"{t(lang, 'account.bonus_image')}: {user.bonus_image_requests or 0}",
+        f"{t(lang, 'account.bonus_voice')}: {user.bonus_voice_requests or 0}",
+        f"{t(lang, 'account.bonus_coursework')}: {user.bonus_coursework_requests or 0}",
     ]
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text=t(lang, "buy.title"), callback_data="buy:packs")],
             [InlineKeyboardButton(text=t(lang, "account.enter_promo"), callback_data="promo:enter")],
             [InlineKeyboardButton(text=t(lang, "menu.main"), callback_data="nav:main")],
         ]
