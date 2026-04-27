@@ -13,8 +13,19 @@ class Base(DeclarativeBase):
     pass
 
 
-def _engine_kwargs() -> dict[str, object]:
-    url = settings.DATABASE_URL
+def _normalize_url(url: str) -> str:
+    if url.startswith("postgresql+"):
+        return url
+    if url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url[len("postgres://"):]
+    if url.startswith("sqlite://") and not url.startswith("sqlite+"):
+        return "sqlite+aiosqlite://" + url[len("sqlite://"):]
+    return url
+
+
+def _engine_kwargs(url: str) -> dict[str, object]:
     kwargs: dict[str, object] = {"pool_pre_ping": True, "future": True}
     if url.startswith("sqlite"):
         return kwargs
@@ -24,7 +35,9 @@ def _engine_kwargs() -> dict[str, object]:
     return kwargs
 
 
-engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs())
+DATABASE_URL = _normalize_url(settings.DATABASE_URL)
+
+engine = create_async_engine(DATABASE_URL, **_engine_kwargs(DATABASE_URL))
 
 async_session_maker = async_sessionmaker(
     bind=engine,
