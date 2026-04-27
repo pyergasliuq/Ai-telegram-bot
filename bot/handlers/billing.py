@@ -40,7 +40,7 @@ from bot.services.payments import (
     has_active_subscription,
     stars_for_usd,
 )
-from bot.services.promo import already_used, apply_discount, find_active
+from bot.services.promo import PromoError, already_used, apply_discount, find_active
 
 log = logging.getLogger(__name__)
 router = Router(name="billing")
@@ -105,8 +105,11 @@ async def pay_stars(cq: CallbackQuery, session: AsyncSession, user: User, lang: 
     if pending_code:
         promo = await find_active(session, pending_code)
         if promo and not await already_used(session, promo.id, user.telegram_id):
-            usd = await apply_discount(session, promo, user.telegram_id, usd)
-            discount_promo = pending_code
+            try:
+                usd = await apply_discount(session, promo, user.telegram_id, usd, user=user)
+                discount_promo = pending_code
+            except PromoError as e:
+                log.info("promo apply rejected: %s", e)
             data = dict(user.settings_data or {})
             data.pop("pending_promo", None)
             user.settings_data = data
@@ -147,7 +150,10 @@ async def pay_crypto_create(cq: CallbackQuery, session: AsyncSession, user: User
     if pending_code:
         promo = await find_active(session, pending_code)
         if promo and not await already_used(session, promo.id, user.telegram_id):
-            usd = await apply_discount(session, promo, user.telegram_id, usd)
+            try:
+                usd = await apply_discount(session, promo, user.telegram_id, usd, user=user)
+            except PromoError as e:
+                log.info("promo apply rejected: %s", e)
             data = dict(user.settings_data or {})
             data.pop("pending_promo", None)
             user.settings_data = data

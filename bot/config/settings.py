@@ -74,8 +74,13 @@ class Settings(BaseSettings):
     ADMIN_IDS_RAW: str = Field(default="2080411409", alias="ADMIN_IDS")
     DEFAULT_LANGUAGE: str = "ru"
 
-    DATABASE_URL: str = "sqlite+aiosqlite:///./aibot.db"
+    DATABASE_URL: str = "postgresql+asyncpg://aibot:aibot@localhost:5432/aibot"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_RECYCLE_S: int = 1800
     REDIS_URL: str = ""
+
+    SHARED_DIR: str = "/app/shared"
 
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
@@ -88,6 +93,13 @@ class Settings(BaseSettings):
     CLOUDFLARE_API_KEY: str = ""
     CLOUDFLARE_ACCOUNT_ID: str = ""
     FIREWORKS_API_KEY: str = ""
+
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    VERTEX_API_KEY: str = ""
+    VERTEX_PROJECT: str = ""
+    VERTEX_LOCATION: str = "us-central1"
+    PERPLEXITY_API_KEY: str = ""
 
     CRYPTO_BOT_TOKEN: str = ""
     CRYPTO_BOT_TESTNET: bool = False
@@ -121,6 +133,47 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def shared_path(*parts: str) -> Path:
+    base = Path(settings.SHARED_DIR)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        base = PROJECT_ROOT / ".shared"
+        base.mkdir(parents=True, exist_ok=True)
+    p = base.joinpath(*parts) if parts else base
+    if parts:
+        p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+FREE_TIER_PROVIDERS: set[str] = {
+    "google",
+    "groq",
+    "openrouter",
+    "huggingface",
+    "onlysq",
+    "together",
+    "cerebras",
+    "sambanova",
+    "cloudflare",
+    "fireworks",
+}
+
+PAID_TIER_PROVIDERS: set[str] = {
+    "openai",
+    "anthropic",
+    "vertex",
+    "perplexity",
+}
+
+PLAN_PROVIDER_ACCESS: dict[Plan, set[str]] = {
+    Plan.FREE: FREE_TIER_PROVIDERS,
+    Plan.PLUS: FREE_TIER_PROVIDERS,
+    Plan.PRO: FREE_TIER_PROVIDERS | PAID_TIER_PROVIDERS,
+    Plan.MAX: FREE_TIER_PROVIDERS | PAID_TIER_PROVIDERS,
+}
 
 
 PLAN_LIMITS: dict[Plan, dict[str, int]] = {
@@ -257,6 +310,7 @@ ANTISPAM: dict[str, int] = {
 PROVIDERS: dict[str, dict[str, Any]] = {
     "google": {
         "active": True,
+        "tier": "free",
         "key_env": "GOOGLE_API_KEY",
         "models": {
             "gemini-2.5-flash": {"rpm": 15, "tpm": 1_000_000, "tags": ["text", "fast", "balance"]},
@@ -275,6 +329,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "groq": {
         "active": True,
+        "tier": "free",
         "key_env": "GROQ_API_KEY",
         "base_url": "https://api.groq.com/openai/v1",
         "models": {
@@ -289,22 +344,28 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "openrouter": {
         "active": True,
+        "tier": "free",
         "key_env": "OPENROUTER_API_KEY",
         "base_url": "https://openrouter.ai/api/v1",
         "models": {
             "deepseek/deepseek-chat-v3-0324:free": {"rpm": 20, "tags": ["text", "balance", "reasoning"]},
             "deepseek/deepseek-r1:free": {"rpm": 20, "tags": ["text", "max", "reasoning", "verifier"]},
+            "deepseek/deepseek-v4-flash:free": {"rpm": 20, "tags": ["text", "balance", "reasoning"]},
+            "deepseek/deepseek-v4-pro:free": {"rpm": 10, "tags": ["text", "max", "reasoning", "verifier"]},
             "qwen/qwen3-235b-a22b:free": {"rpm": 20, "tags": ["text", "max", "reasoning"]},
             "qwen/qwen3-coder:free": {"rpm": 20, "tags": ["text", "code"]},
             "qwen/qwen-2.5-72b-instruct:free": {"rpm": 20, "tags": ["text", "balance"]},
             "meta-llama/llama-3.3-70b-instruct:free": {"rpm": 20, "tags": ["text", "balance"]},
             "moonshotai/kimi-k2:free": {"rpm": 20, "tags": ["text", "balance", "search"]},
+            "moonshotai/kimi-k2.5:free": {"rpm": 15, "tags": ["text", "balance", "search", "reasoning"]},
             "google/gemini-2.0-flash-exp:free": {"rpm": 20, "tags": ["text", "fast"]},
             "perplexity/sonar-reasoning": {"rpm": 10, "tags": ["text", "search", "verifier"]},
+            "perplexity/searchgpt-pro": {"rpm": 10, "tags": ["text", "search"]},
         },
     },
     "huggingface": {
         "active": False,
+        "tier": "free",
         "key_env": "HUGGINGFACE_API_KEY",
         "base_url": "https://api-inference.huggingface.co",
         "models": {
@@ -314,6 +375,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "onlysq": {
         "active": True,
+        "tier": "free",
         "key_env": "ONLYSQ_API_KEY",
         "base_url": "https://api.onlysq.ru/ai/v2",
         "models": {
@@ -334,6 +396,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "together": {
         "active": True,
+        "tier": "free",
         "key_env": "TOGETHER_API_KEY",
         "base_url": "https://api.together.xyz/v1",
         "models": {
@@ -351,6 +414,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "cerebras": {
         "active": True,
+        "tier": "free",
         "key_env": "CEREBRAS_API_KEY",
         "base_url": "https://api.cerebras.ai/v1",
         "models": {
@@ -362,6 +426,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "sambanova": {
         "active": True,
+        "tier": "free",
         "key_env": "SAMBANOVA_API_KEY",
         "base_url": "https://api.sambanova.ai/v1",
         "models": {
@@ -374,6 +439,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "cloudflare": {
         "active": True,
+        "tier": "free",
         "key_env": "CLOUDFLARE_API_KEY",
         "models": {
             "@cf/meta/llama-3.3-70b-instruct-fp8-fast": {"rpm": 20, "tags": ["text", "balance"]},
@@ -388,6 +454,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "fireworks": {
         "active": True,
+        "tier": "free",
         "key_env": "FIREWORKS_API_KEY",
         "base_url": "https://api.fireworks.ai/inference/v1",
         "models": {
@@ -395,6 +462,57 @@ PROVIDERS: dict[str, dict[str, Any]] = {
             "accounts/fireworks/models/deepseek-v3": {"rpm": 10, "tags": ["text", "max", "reasoning"]},
             "accounts/fireworks/models/deepseek-r1": {"rpm": 5, "tags": ["text", "max", "reasoning", "verifier"]},
             "accounts/fireworks/models/qwen3-235b-a22b": {"rpm": 5, "tags": ["text", "max", "reasoning"]},
+        },
+    },
+    "openai": {
+        "active": True,
+        "tier": "paid",
+        "key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "models": {
+            "gpt-4.5": {"rpm": 60, "tags": ["text", "balance", "reasoning"]},
+            "gpt-5": {"rpm": 60, "tags": ["text", "max", "reasoning", "verifier"]},
+            "gpt-5-mini": {"rpm": 120, "tags": ["text", "balance", "reasoning"]},
+            "gpt-4o": {"rpm": 60, "tags": ["text", "balance", "reasoning"]},
+            "gpt-4o-mini": {"rpm": 120, "tags": ["text", "fast"]},
+            "o4-mini": {"rpm": 60, "tags": ["text", "balance", "reasoning"]},
+            "dall-e-3": {"rpm": 30, "tags": ["image"]},
+            "whisper-1": {"rpm": 60, "tags": ["stt"]},
+            "tts-1-hd": {"rpm": 60, "tags": ["tts"]},
+        },
+    },
+    "anthropic": {
+        "active": True,
+        "tier": "paid",
+        "key_env": "ANTHROPIC_API_KEY",
+        "base_url": "https://api.anthropic.com/v1",
+        "models": {
+            "claude-3-5-sonnet-latest": {"rpm": 50, "tags": ["text", "balance", "reasoning", "verifier"]},
+            "claude-3-5-opus-latest": {"rpm": 30, "tags": ["text", "max", "reasoning", "verifier"]},
+            "claude-3-5-haiku-latest": {"rpm": 100, "tags": ["text", "fast", "summarizer"]},
+        },
+    },
+    "vertex": {
+        "active": True,
+        "tier": "paid",
+        "key_env": "VERTEX_API_KEY",
+        "models": {
+            "gemini-4-ultra": {"rpm": 30, "tags": ["text", "max", "reasoning", "verifier"]},
+            "gemini-4-pro": {"rpm": 30, "tags": ["text", "max", "reasoning"]},
+            "gemini-4-flash": {"rpm": 60, "tags": ["text", "balance"]},
+            "gemini-3-pro": {"rpm": 30, "tags": ["text", "max", "reasoning"]},
+        },
+    },
+    "perplexity": {
+        "active": True,
+        "tier": "paid",
+        "key_env": "PERPLEXITY_API_KEY",
+        "base_url": "https://api.perplexity.ai",
+        "models": {
+            "sonar": {"rpm": 60, "tags": ["text", "search"]},
+            "sonar-pro": {"rpm": 30, "tags": ["text", "search", "reasoning"]},
+            "sonar-reasoning-pro": {"rpm": 30, "tags": ["text", "search", "reasoning", "verifier"]},
+            "sonar-deep-research": {"rpm": 10, "tags": ["text", "search", "reasoning"]},
         },
     },
 }
@@ -502,7 +620,11 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     },
     Plan.PRO: {
         TaskType.TEXT_GENERAL: [
+            _m("openai", "gpt-5-mini"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("vertex", "gemini-4-pro"),
             _m("google", "gemini-2.5-pro"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("openrouter", "qwen/qwen3-235b-a22b:free"),
             _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
             _m("groq", "llama-3.3-70b-versatile"),
@@ -510,6 +632,10 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
             _m("onlysq", "gpt-4o"),
         ],
         TaskType.TEXT_REASONING: [
+            _m("openai", "gpt-5"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("vertex", "gemini-4-pro"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
             _m("google", "gemini-3-pro"),
@@ -518,93 +644,127 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
             _m("sambanova", "DeepSeek-V3-0324"),
         ],
         TaskType.CODE: [
+            _m("openai", "gpt-5"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
             _m("openrouter", "qwen/qwen3-coder:free"),
             _m("groq", "openai/gpt-oss-120b"),
             _m("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
             _m("onlysq", "gpt-4o"),
         ],
         TaskType.SUMMARIZER: [
+            _m("anthropic", "claude-3-5-haiku-latest"),
             _m("groq", "llama-3.1-8b-instant"),
             _m("google", "gemma-4-31b"),
             _m("cerebras", "llama3.1-8b"),
         ],
         TaskType.SEARCH: [
+            _m("perplexity", "sonar-pro"),
+            _m("perplexity", "sonar-reasoning-pro"),
             _m("onlysq", "sonar-reasoning-pro"),
             _m("openrouter", "perplexity/sonar-reasoning"),
+            _m("openrouter", "moonshotai/kimi-k2.5:free"),
             _m("openrouter", "moonshotai/kimi-k2:free"),
         ],
         TaskType.IMAGE: [
+            _m("openai", "dall-e-3"),
             _m("google", "gemini-2.5-flash-image"),
             _m("onlysq", "flux-dev"),
             _m("cloudflare", "@cf/black-forest-labs/flux-1-schnell"),
         ],
         TaskType.STT: [
+            _m("openai", "whisper-1"),
             _m("groq", "whisper-large-v3"),
             _m("together", "openai/whisper-large-v3"),
         ],
         TaskType.TTS: [
+            _m("openai", "tts-1-hd"),
             _m("google", "gemini-2.5-tts"),
             _m("together", "cartesia/sonic-3"),
         ],
         TaskType.VERIFIER: [
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("openai", "gpt-5"),
+            _m("perplexity", "sonar-reasoning-pro"),
             _m("onlysq", "claude-sonnet-4"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
-            _m("onlysq", "sonar-reasoning-pro"),
         ],
     },
     Plan.MAX: {
         TaskType.TEXT_GENERAL: [
+            _m("vertex", "gemini-4-ultra"),
+            _m("openai", "gpt-5"),
+            _m("anthropic", "claude-3-5-opus-latest"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
+            _m("vertex", "gemini-4-pro"),
             _m("google", "gemini-4-pro"),
             _m("google", "gemini-3-pro"),
             _m("onlysq", "gpt-5"),
             _m("onlysq", "claude-sonnet-4"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("openrouter", "qwen/qwen3-235b-a22b:free"),
             _m("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"),
         ],
         TaskType.TEXT_REASONING: [
+            _m("vertex", "gemini-4-ultra"),
+            _m("openai", "gpt-5"),
+            _m("anthropic", "claude-3-5-opus-latest"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
             _m("onlysq", "gpt-5"),
             _m("onlysq", "claude-sonnet-4"),
             _m("onlysq", "deepseek-r1"),
+            _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
             _m("google", "gemini-4-pro"),
             _m("fireworks", "accounts/fireworks/models/deepseek-r1"),
         ],
         TaskType.CODE: [
+            _m("openai", "gpt-5"),
+            _m("anthropic", "claude-3-5-sonnet-latest"),
             _m("onlysq", "gpt-5"),
             _m("onlysq", "claude-sonnet-4"),
             _m("openrouter", "qwen/qwen3-coder:free"),
             _m("groq", "openai/gpt-oss-120b"),
         ],
         TaskType.SUMMARIZER: [
+            _m("anthropic", "claude-3-5-haiku-latest"),
             _m("google", "gemma-4-31b"),
             _m("groq", "llama-3.1-8b-instant"),
             _m("cerebras", "llama3.1-8b"),
         ],
         TaskType.SEARCH: [
+            _m("perplexity", "sonar-deep-research"),
+            _m("perplexity", "sonar-reasoning-pro"),
+            _m("perplexity", "sonar-pro"),
             _m("onlysq", "sonar-reasoning-pro"),
             _m("openrouter", "perplexity/sonar-reasoning"),
-            _m("openrouter", "moonshotai/kimi-k2:free"),
+            _m("openrouter", "moonshotai/kimi-k2.5:free"),
         ],
         TaskType.IMAGE: [
+            _m("openai", "dall-e-3"),
             _m("google", "gemini-2.5-flash-image"),
             _m("onlysq", "flux-dev"),
             _m("together", "black-forest-labs/FLUX.1-schnell-Free"),
         ],
         TaskType.STT: [
+            _m("openai", "whisper-1"),
             _m("groq", "whisper-large-v3"),
             _m("together", "openai/whisper-large-v3"),
             _m("cloudflare", "@cf/openai/whisper-large-v3-turbo"),
         ],
         TaskType.TTS: [
+            _m("openai", "tts-1-hd"),
             _m("google", "gemini-2.5-tts"),
             _m("together", "cartesia/sonic-3"),
         ],
         TaskType.VERIFIER: [
+            _m("anthropic", "claude-3-5-opus-latest"),
+            _m("openai", "gpt-5"),
+            _m("vertex", "gemini-4-ultra"),
+            _m("perplexity", "sonar-reasoning-pro"),
             _m("onlysq", "claude-sonnet-4"),
             _m("onlysq", "gpt-5"),
-            _m("onlysq", "sonar-reasoning-pro"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
         ],
     },
@@ -694,12 +854,15 @@ __all__ = [
     "ANTISPAM",
     "CRYPTO_ASSETS",
     "CRYPTO_RATE_TTL_S",
+    "FREE_TIER_PROVIDERS",
     "MODEL_REGISTRY",
     "MOOD_PROMPTS",
+    "PAID_TIER_PROVIDERS",
     "PLAN_DURATIONS",
     "PLAN_FEATURES",
     "PLAN_LIMITS",
     "PLAN_PRICES_USD",
+    "PLAN_PROVIDER_ACCESS",
     "PROMO_DISCOUNT_MAX",
     "PROMO_DISCOUNT_MIN",
     "PROVIDERS",
@@ -722,4 +885,5 @@ __all__ = [
     "TaskType",
     "get_settings",
     "settings",
+    "shared_path",
 ]

@@ -13,6 +13,7 @@ from bot.config.settings import (
     REFERRAL_PROMO_THRESHOLD,
     USER_PROMO_DISCOUNT_MAX,
     USER_PROMO_DISCOUNT_MIN,
+    Plan,
 )
 from bot.db.models import PromoCode, PromoUsage, Referral, User
 
@@ -40,9 +41,37 @@ async def already_used(session: AsyncSession, promo_id: int, user_id: int) -> bo
     return (await session.execute(stmt)).scalar_one_or_none() is not None
 
 
+def check_user_eligible(promo: PromoCode, user: User) -> None:
+    now = datetime.utcnow()
+    has_active = bool(
+        user.subscription_expires_at
+        and user.subscription_expires_at > now
+        and user.current_plan != Plan.FREE.value
+    )
+    if promo.requires_active_subscription and not has_active:
+        raise PromoError("active subscription required")
+    if promo.sponsor_only and not has_active:
+        raise PromoError("sponsor-only code requires active subscription")
+    if promo.min_plan_required:
+        order = [Plan.FREE.value, Plan.PLUS.value, Plan.PRO.value, Plan.MAX.value]
+        try:
+            min_idx = order.index(promo.min_plan_required)
+            cur_idx = order.index(user.current_plan)
+        except ValueError:
+            return
+        if cur_idx < min_idx:
+            raise PromoError("plan too low for this promo")
+
+
 async def apply_discount(
-    session: AsyncSession, promo: PromoCode, user_id: int, amount_usd: Decimal
+    session: AsyncSession,
+    promo: PromoCode,
+    user_id: int,
+    amount_usd: Decimal,
+    user: User | None = None,
 ) -> Decimal:
+    if user is not None:
+        check_user_eligible(promo, user)
     promo.used_count += 1
     session.add(PromoUsage(promo_id=promo.id, user_id=user_id))
     await session.flush()

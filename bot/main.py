@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -9,16 +10,22 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.background import poll_crypto_invoices
-from bot.config.settings import settings
+from bot.config.settings import settings, shared_path
 from bot.handlers import build_root_router
 from bot.handlers.deps import DBSessionMiddleware, UserMiddleware
+from bot.services.payments import crypto_bot
 
 
 def _setup_logging() -> None:
-    logging.basicConfig(
-        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    fmt = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    try:
+        log_file = shared_path("logs", "bot.log")
+        handlers.append(RotatingFileHandler(log_file, maxBytes=10_000_000, backupCount=5, encoding="utf-8"))
+    except OSError:
+        pass
+    logging.basicConfig(level=level, format=fmt, handlers=handlers, force=True)
 
 
 async def _build_dp() -> Dispatcher:
@@ -57,6 +64,7 @@ async def main() -> None:
             await poller
         except asyncio.CancelledError:
             pass
+        await crypto_bot.close()
         await bot.session.close()
 
 
