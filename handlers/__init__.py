@@ -1,6 +1,16 @@
 from aiogram import Router
 
-from handlers import account, admin, billing, callbacks, main_menu, referrals, work_menu
+from handlers import (
+    account,
+    admin,
+    billing,
+    callbacks,
+    coursework,
+    file_answer,
+    main_menu,
+    referrals,
+    work_menu,
+)
 
 
 def build_root_router() -> Router:
@@ -11,6 +21,8 @@ def build_root_router() -> Router:
         billing.router,
         account.router,
         referrals.router,
+        coursework.router,
+        file_answer.router,
         work_menu.router,
         callbacks.router,
     )

@@ -5,6 +5,14 @@ class ChatStates(StatesGroup):
     in_chat = State()
 
 
+class CourseworkStates(StatesGroup):
+    waiting_topic = State()
+
+
+class FileAnswerStates(StatesGroup):
+    waiting_question = State()
+
+
 class PromoStates(StatesGroup):
     waiting_code = State()
 
