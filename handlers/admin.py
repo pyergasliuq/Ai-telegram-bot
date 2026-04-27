@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from datetime import datetime, timedelta
+from functools import wraps
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
@@ -46,7 +48,18 @@ def is_admin(tg_id: int) -> bool:
 
 
 def _admin_only(handler):
-    async def _wrap(event, *args, **kwargs):
+    sig = inspect.signature(handler)
+    params = list(sig.parameters.values())
+    has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+    allowed = {
+        p.name
+        for p in params[1:]
+        if p.kind
+        in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    }
+
+    @wraps(handler)
+    async def _wrap(event, **kwargs):
         from_user = getattr(event, "from_user", None)
         if not from_user or not is_admin(from_user.id):
             lang = kwargs.get("lang", "ru")
@@ -54,10 +67,11 @@ def _admin_only(handler):
                 await event.answer(t(lang, "admin.no_access"))
             elif isinstance(event, CallbackQuery):
                 await event.answer(t(lang, "admin.no_access"), show_alert=True)
-            return
-        return await handler(event, *args, **kwargs)
+            return None
+        if has_kwargs:
+            return await handler(event, **kwargs)
+        return await handler(event, **{k: v for k, v in kwargs.items() if k in allowed})
 
-    _wrap.__name__ = handler.__name__
     return _wrap
 
 

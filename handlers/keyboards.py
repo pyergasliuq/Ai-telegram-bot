@@ -19,7 +19,11 @@ from settings import (
 )
 
 
-def main_menu_kb(lang: str, with_referrals: bool = True) -> ReplyKeyboardMarkup:
+def main_menu_kb(
+    lang: str,
+    with_referrals: bool = True,
+    is_admin: bool = False,
+) -> ReplyKeyboardMarkup:
     rows: list[list[KeyboardButton]] = [
         [KeyboardButton(text=t(lang, "menu.start_work"))],
         [KeyboardButton(text=t(lang, "menu.upgrade")), KeyboardButton(text=t(lang, "menu.account"))],
@@ -27,6 +31,8 @@ def main_menu_kb(lang: str, with_referrals: bool = True) -> ReplyKeyboardMarkup:
     ]
     if with_referrals:
         rows.append([KeyboardButton(text=t(lang, "menu.referrals"))])
+    if is_admin:
+        rows.append([KeyboardButton(text=t(lang, "menu.admin"))])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
