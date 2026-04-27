@@ -23,7 +23,7 @@ Senior Python Developer and AI Architect.
 9. **No Fluff**: No summaries of "what you did" inside code. No `# This function does X`. Provide code only.
 
 ## KEY FILES
-- `main.py` — root entry point, long polling + aiohttp `/health` on port 3000.
+- `main.py` — root entry point, aiogram long polling.
 - `settings.py` — single source of truth (Plan/Mood/Task enums, PROVIDERS, MODEL_REGISTRY, PLAN_LIMITS, PLAN_PROVIDER_ACCESS, PLAN_PRICES_USD, ANTISPAM, etc.).
 - `core/router.py` — hybrid free/paid routing with failover.
 - `core/pipeline.py` — 1/2/3-stage logic.
