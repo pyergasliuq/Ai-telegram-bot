@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.core.i18n import t
 from bot.db.models import User
 from bot.handlers.states import PromoStates
-from bot.services.promo import already_used, find_active
+from bot.services.promo import PromoError, already_used, check_user_eligible, find_active
 from bot.services.users import current_plan, referral_stats
 
 router = Router(name="account")
@@ -61,6 +61,12 @@ async def promo_apply(message: Message, state: FSMContext, session: AsyncSession
         return
     if await already_used(session, promo.id, user.telegram_id):
         await message.answer(t(lang, "account.promo_used"))
+        await state.clear()
+        return
+    try:
+        check_user_eligible(promo, user)
+    except PromoError:
+        await message.answer(t(lang, "account.promo_invalid"))
         await state.clear()
         return
     user_data = dict(user.settings_data or {})

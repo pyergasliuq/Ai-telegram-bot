@@ -13,11 +13,18 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    future=True,
-)
+def _engine_kwargs() -> dict[str, object]:
+    url = settings.DATABASE_URL
+    kwargs: dict[str, object] = {"pool_pre_ping": True, "future": True}
+    if url.startswith("sqlite"):
+        return kwargs
+    kwargs["pool_size"] = settings.DB_POOL_SIZE
+    kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+    kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_S
+    return kwargs
+
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs())
 
 async_session_maker = async_sessionmaker(
     bind=engine,

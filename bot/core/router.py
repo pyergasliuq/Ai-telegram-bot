@@ -7,6 +7,7 @@ from typing import Any
 
 from bot.config.settings import (
     MODEL_REGISTRY,
+    PLAN_PROVIDER_ACCESS,
     PROVIDERS,
     SPEED_TAG_MAP,
     Plan,
@@ -54,7 +55,18 @@ def _provider_active(provider: str) -> bool:
         return bool(getattr(settings, "CLOUDFLARE_API_KEY", "")) and bool(
             getattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
         )
+    if provider == "vertex":
+        if not getattr(settings, "VERTEX_API_KEY", ""):
+            return bool(getattr(settings, "GOOGLE_API_KEY", ""))
+        return True
     return bool(getattr(settings, key_env, ""))
+
+
+def _plan_allows_provider(plan: Plan, provider: str) -> bool:
+    allowed = PLAN_PROVIDER_ACCESS.get(plan)
+    if allowed is None:
+        return True
+    return provider in allowed
 
 
 def _model_tags(provider: str, model: str) -> list[str]:
@@ -77,7 +89,11 @@ def _score(provider: str, model: str, speed_mode: SpeedMode) -> int:
 
 
 def _ordered(plan: Plan, task_type: TaskType, speed_mode: SpeedMode) -> list[tuple[str, str]]:
-    cands = [(p, m) for (p, m) in _candidates(plan, task_type) if _provider_active(p)]
+    cands = [
+        (p, m)
+        for (p, m) in _candidates(plan, task_type)
+        if _plan_allows_provider(plan, p) and _provider_active(p)
+    ]
     cands.sort(key=lambda pm: _score(pm[0], pm[1], speed_mode), reverse=True)
     return cands
 

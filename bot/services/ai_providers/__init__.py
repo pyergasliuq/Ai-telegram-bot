@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from bot.config.settings import PROVIDERS, settings
+from bot.services.ai_providers.anthropic import AnthropicProvider
 from bot.services.ai_providers.base import (
     BaseProvider,
     ChatMessage,
@@ -17,9 +18,12 @@ from bot.services.ai_providers.google import GoogleProvider
 from bot.services.ai_providers.groq import GroqProvider
 from bot.services.ai_providers.huggingface import HuggingfaceProvider
 from bot.services.ai_providers.onlysq import OnlySQProvider
+from bot.services.ai_providers.openai import OpenAIProvider
 from bot.services.ai_providers.openrouter import OpenRouterProvider
+from bot.services.ai_providers.perplexity import PerplexityProvider
 from bot.services.ai_providers.sambanova import SambaNovaProvider
 from bot.services.ai_providers.together import TogetherProvider
+from bot.services.ai_providers.vertex import VertexProvider
 
 
 def _build() -> dict[str, BaseProvider]:
@@ -60,6 +64,24 @@ def _build() -> dict[str, BaseProvider]:
         "fireworks": FireworksProvider(
             api_key=settings.FIREWORKS_API_KEY,
             base_url=PROVIDERS["fireworks"]["base_url"],
+        ),
+        "openai": OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=PROVIDERS["openai"]["base_url"],
+        ),
+        "anthropic": AnthropicProvider(
+            api_key=settings.ANTHROPIC_API_KEY,
+            base_url=PROVIDERS["anthropic"]["base_url"],
+        ),
+        "vertex": VertexProvider(
+            api_key=settings.VERTEX_API_KEY,
+            project=settings.VERTEX_PROJECT,
+            location=settings.VERTEX_LOCATION,
+            fallback_api_key=settings.GOOGLE_API_KEY,
+        ),
+        "perplexity": PerplexityProvider(
+            api_key=settings.PERPLEXITY_API_KEY,
+            base_url=PROVIDERS["perplexity"]["base_url"],
         ),
     }
 

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-import httpx
+from aiocryptopay import AioCryptoPay, Networks
 from aiogram import Bot
 from aiogram.types import LabeledPrice
 from sqlalchemy import select
@@ -90,27 +90,26 @@ async def create_trial_invoice(bot: Bot, chat_id: int, plan: Plan, payload: str)
 class CryptoBotClient:
     def __init__(self, token: str, testnet: bool = False) -> None:
         self.token = token
-        self.base_url = (
-            "https://testnet-pay.crypt.bot/api" if testnet else "https://pay.crypt.bot/api"
-        )
+        self.testnet = testnet
+        self._client: AioCryptoPay | None = None
 
     @property
     def available(self) -> bool:
         return bool(self.token)
 
-    async def _request(self, method: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        if not self.available:
-            raise RuntimeError("crypto-bot: missing token")
-        headers = {"Crypto-Pay-API-Token": self.token, "Content-Type": "application/json"}
-        url = f"{self.base_url}/{method}"
-        async with httpx.AsyncClient(timeout=20) as cli:
-            r = await cli.post(url, headers=headers, json=payload or {})
-        if r.status_code >= 400:
-            raise RuntimeError(f"crypto-bot: HTTP {r.status_code} {r.text[:200]}")
-        data = r.json()
-        if not data.get("ok"):
-            raise RuntimeError(f"crypto-bot: {data}")
-        return data["result"]
+    def _ensure(self) -> AioCryptoPay:
+        if self._client is None:
+            network = Networks.TEST_NET if self.testnet else Networks.MAIN_NET
+            self._client = AioCryptoPay(token=self.token, network=network)
+        return self._client
+
+    async def close(self) -> None:
+        if self._client is not None:
+            try:
+                await self._client.close()
+            except Exception:
+                log.exception("crypto-bot close failed")
+            self._client = None
 
     async def create_invoice(
         self,
@@ -120,23 +119,55 @@ class CryptoBotClient:
         payload: str,
         expires_in: int = 3600,
     ) -> dict[str, Any]:
-        body = {
-            "asset": asset,
-            "amount": str(amount),
-            "description": description,
-            "hidden_message": "Спасибо за оплату!",
-            "payload": payload,
-            "expires_in": expires_in,
-            "allow_comments": False,
-            "allow_anonymous": True,
-        }
-        return await self._request("createInvoice", body)
+        if not self.available:
+            raise RuntimeError("crypto-bot: missing token")
+        cli = self._ensure()
+        invoice = await cli.create_invoice(
+            asset=asset,
+            amount=float(amount),
+            description=description,
+            payload=payload,
+            expires_in=expires_in,
+            hidden_message="Спасибо за оплату!",
+            allow_comments=False,
+            allow_anonymous=True,
+        )
+        return _invoice_to_dict(invoice)
 
     async def get_invoices(self, invoice_ids: list[str]) -> list[dict[str, Any]]:
-        body = {"invoice_ids": ",".join(invoice_ids)} if invoice_ids else {}
-        result = await self._request("getInvoices", body)
-        items = result.get("items") if isinstance(result, dict) else result
-        return list(items or [])
+        if not self.available:
+            raise RuntimeError("crypto-bot: missing token")
+        cli = self._ensure()
+        ids = [int(x) for x in invoice_ids if str(x).isdigit()]
+        invoices = await cli.get_invoices(invoice_ids=ids) if ids else await cli.get_invoices()
+        if not isinstance(invoices, list):
+            invoices = [invoices] if invoices else []
+        return [_invoice_to_dict(i) for i in invoices]
+
+
+def _invoice_to_dict(inv: Any) -> dict[str, Any]:
+    if isinstance(inv, dict):
+        return inv
+    keys = (
+        "invoice_id",
+        "status",
+        "asset",
+        "amount",
+        "pay_url",
+        "bot_invoice_url",
+        "mini_app_invoice_url",
+        "web_app_invoice_url",
+        "payload",
+        "description",
+        "created_at",
+        "paid_at",
+    )
+    data: dict[str, Any] = {}
+    for k in keys:
+        if hasattr(inv, k):
+            v = getattr(inv, k)
+            data[k] = v
+    return data
 
 
 crypto_bot = CryptoBotClient(token=settings.CRYPTO_BOT_TOKEN, testnet=settings.CRYPTO_BOT_TESTNET)
