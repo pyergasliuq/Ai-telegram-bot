@@ -114,8 +114,6 @@ class Settings(BaseModel):
     SUMMARIZE_EVERY_N_MESSAGES: int = 4
     KEEP_RECENT_MESSAGES: int = 30
 
-    HEALTH_PORT: int = 3000
-
     @computed_field  # type: ignore[misc]
     @property
     def ADMIN_IDS(self) -> set[int]:

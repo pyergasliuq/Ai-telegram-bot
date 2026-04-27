@@ -7,7 +7,6 @@ from logging.handlers import RotatingFileHandler
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiohttp import web
 
 from background import poll_crypto_invoices
 from core.fsm_storage import SQLAlchemyStorage
@@ -47,21 +46,6 @@ async def _build_dp() -> Dispatcher:
     return dp
 
 
-async def _health(_: web.Request) -> web.Response:
-    return web.Response(text="ok")
-
-
-async def _start_health_server() -> web.AppRunner:
-    app = web.Application()
-    app.router.add_get("/", _health)
-    app.router.add_get("/health", _health)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", settings.HEALTH_PORT)
-    await site.start()
-    return runner
-
-
 async def main() -> None:
     _setup_logging()
     if not settings.BOT_TOKEN:
@@ -75,7 +59,6 @@ async def main() -> None:
     )
     dp = await _build_dp()
 
-    health_runner = await _start_health_server()
     poller = asyncio.create_task(poll_crypto_invoices())
     try:
         await dp.start_polling(bot)
@@ -85,7 +68,6 @@ async def main() -> None:
             await poller
         except asyncio.CancelledError:
             pass
-        await health_runner.cleanup()
         await crypto_bot.close()
         await bot.session.close()
 
