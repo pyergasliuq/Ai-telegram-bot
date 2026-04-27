@@ -386,3 +386,10 @@ async def admin_promonew_run(message: Message, state: FSMContext, session: Async
         await message.answer(t(lang, "referral.promo_invalid"))
         return
     await message.answer(t(lang, "referral.promo_created", code=promo.code, discount=promo.discount_percent))
+
+
+@router.callback_query(F.data == "admin:withdraw")
+@_admin_only
+async def admin_withdraw(cq: CallbackQuery, lang: str) -> None:
+    await cq.message.answer(t(lang, "admin.withdraw_info"), reply_markup=admin_menu_kb(lang))
+    await cq.answer()

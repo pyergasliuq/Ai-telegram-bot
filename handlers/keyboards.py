@@ -202,6 +202,7 @@ def admin_menu_kb(lang: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=t(lang, "admin.channels"), callback_data="admin:channels")],
         [InlineKeyboardButton(text=t(lang, "admin.providers"), callback_data="admin:providers")],
         [InlineKeyboardButton(text=t(lang, "admin.promos"), callback_data="admin:promos")],
+        [InlineKeyboardButton(text=t(lang, "admin.withdraw"), callback_data="admin:withdraw")],
         [InlineKeyboardButton(text=t(lang, "menu.main"), callback_data="nav:main")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
