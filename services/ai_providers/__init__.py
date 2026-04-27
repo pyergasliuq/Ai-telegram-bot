@@ -13,9 +13,11 @@ from services.ai_providers.base import (
 from services.ai_providers.cerebras import CerebrasProvider
 from services.ai_providers.cloudflare import CloudflareProvider
 from services.ai_providers.fireworks import FireworksProvider
+from services.ai_providers.github_models import GitHubModelsProvider
 from services.ai_providers.google import GoogleProvider
 from services.ai_providers.groq import GroqProvider
 from services.ai_providers.huggingface import HuggingfaceProvider
+from services.ai_providers.nim import NIMProvider
 from services.ai_providers.onlysq import OnlySQProvider
 from services.ai_providers.openai import OpenAIProvider
 from services.ai_providers.openrouter import OpenRouterProvider
@@ -64,6 +66,14 @@ def _build() -> dict[str, BaseProvider]:
         "fireworks": FireworksProvider(
             api_key=settings.FIREWORKS_API_KEY,
             base_url=PROVIDERS["fireworks"]["base_url"],
+        ),
+        "github_models": GitHubModelsProvider(
+            api_key=settings.GITHUB_MODELS_API_KEY,
+            base_url=PROVIDERS["github_models"]["base_url"],
+        ),
+        "nim": NIMProvider(
+            api_key=settings.NVIDIA_API_KEY,
+            base_url=PROVIDERS["nim"]["base_url"],
         ),
         "openai": OpenAIProvider(
             api_key=settings.OPENAI_API_KEY,

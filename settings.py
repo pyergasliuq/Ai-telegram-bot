@@ -91,6 +91,8 @@ class Settings(BaseModel):
     CLOUDFLARE_API_KEY: str = ""
     CLOUDFLARE_ACCOUNT_ID: str = ""
     FIREWORKS_API_KEY: str = ""
+    GITHUB_MODELS_API_KEY: str = ""
+    NVIDIA_API_KEY: str = ""
 
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
@@ -172,6 +174,8 @@ FREE_TIER_PROVIDERS: set[str] = {
     "sambanova",
     "cloudflare",
     "fireworks",
+    "github_models",
+    "nim",
 }
 
 PAID_TIER_PROVIDERS: set[str] = {
@@ -484,6 +488,35 @@ PROVIDERS: dict[str, dict[str, Any]] = {
             "accounts/fireworks/models/qwen3-235b-a22b": {"rpm": 5, "tags": ["text", "max", "reasoning"]},
         },
     },
+    "github_models": {
+        "active": True,
+        "tier": "free",
+        "key_env": "GITHUB_MODELS_API_KEY",
+        "base_url": "https://models.github.ai/inference",
+        "models": {
+            "openai/gpt-4o-mini": {"rpm": 15, "tags": ["text", "fast", "balance"]},
+            "openai/gpt-4o": {"rpm": 8, "tags": ["text", "balance", "reasoning"]},
+            "meta/Llama-3.3-70B-Instruct": {"rpm": 10, "tags": ["text", "balance", "reasoning"]},
+            "mistral-ai/Mistral-Large-2411": {"rpm": 8, "tags": ["text", "balance", "reasoning"]},
+            "deepseek/DeepSeek-V3-0324": {"rpm": 8, "tags": ["text", "max", "reasoning"]},
+            "deepseek/DeepSeek-R1": {"rpm": 5, "tags": ["text", "max", "reasoning", "verifier"]},
+            "cohere/Cohere-command-r-plus-08-2024": {"rpm": 8, "tags": ["text", "balance", "search"]},
+        },
+    },
+    "nim": {
+        "active": True,
+        "tier": "free",
+        "key_env": "NVIDIA_API_KEY",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "models": {
+            "meta/llama-3.3-70b-instruct": {"rpm": 30, "tags": ["text", "balance", "reasoning"]},
+            "meta/llama-3.1-8b-instruct": {"rpm": 60, "tags": ["text", "fast", "summarizer"]},
+            "qwen/qwen2.5-72b-instruct": {"rpm": 20, "tags": ["text", "balance", "reasoning"]},
+            "deepseek-ai/deepseek-r1": {"rpm": 10, "tags": ["text", "max", "reasoning", "verifier"]},
+            "google/gemma-3-27b-it": {"rpm": 30, "tags": ["text", "fast", "summarizer"]},
+            "mistralai/mixtral-8x22b-instruct-v0.1": {"rpm": 20, "tags": ["text", "balance"]},
+        },
+    },
     "openai": {
         "active": True,
         "tier": "paid",
@@ -589,6 +622,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     Plan.PLUS: {
         TaskType.TEXT_GENERAL: [
             _m("groq", "llama-3.3-70b-versatile"),
+            _m("nim", "meta/llama-3.3-70b-instruct"),
+            _m("github_models", "meta/Llama-3.3-70B-Instruct"),
             _m("cerebras", "llama-3.3-70b"),
             _m("sambanova", "Meta-Llama-3.3-70B-Instruct"),
             _m("together", "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
@@ -598,6 +633,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
         ],
         TaskType.TEXT_REASONING: [
             _m("groq", "llama-3.3-70b-versatile"),
+            _m("nim", "deepseek-ai/deepseek-r1"),
+            _m("github_models", "deepseek/DeepSeek-V3-0324"),
             _m("cerebras", "llama-3.3-70b"),
             _m("google", "gemini-2.5-flash"),
             _m("openrouter", "deepseek/deepseek-chat-v3-0324:free"),
@@ -641,6 +678,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     Plan.PRO: {
         TaskType.TEXT_GENERAL: [
             _m("groq", "llama-3.3-70b-versatile"),
+            _m("nim", "meta/llama-3.3-70b-instruct"),
+            _m("github_models", "meta/Llama-3.3-70B-Instruct"),
             _m("cerebras", "gpt-oss-120b"),
             _m("onlysq", "gpt-4o-mini"),
             _m("openrouter", "qwen/qwen3-235b-a22b:free"),
@@ -654,6 +693,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
         ],
         TaskType.TEXT_REASONING: [
             _m("groq", "openai/gpt-oss-120b"),
+            _m("nim", "deepseek-ai/deepseek-r1"),
+            _m("github_models", "deepseek/DeepSeek-R1"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
             _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),
@@ -718,6 +759,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
     Plan.MAX: {
         TaskType.TEXT_GENERAL: [
             _m("groq", "llama-3.3-70b-versatile"),
+            _m("nim", "qwen/qwen2.5-72b-instruct"),
+            _m("github_models", "meta/Llama-3.3-70B-Instruct"),
             _m("cerebras", "gpt-oss-120b"),
             _m("onlysq", "gpt-4o-mini"),
             _m("openrouter", "qwen/qwen3-235b-a22b:free"),
@@ -736,6 +779,8 @@ MODEL_REGISTRY: dict[Plan, dict[TaskType, list[tuple[str, str]]]] = {
         ],
         TaskType.TEXT_REASONING: [
             _m("groq", "openai/gpt-oss-120b"),
+            _m("nim", "deepseek-ai/deepseek-r1"),
+            _m("github_models", "deepseek/DeepSeek-R1"),
             _m("openrouter", "deepseek/deepseek-r1:free"),
             _m("openrouter", "deepseek/deepseek-v4-pro:free"),
             _m("together", "deepseek-ai/DeepSeek-R1"),

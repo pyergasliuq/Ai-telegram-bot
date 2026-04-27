@@ -20,6 +20,19 @@ from settings import (
 )
 
 
+def file_format_kb(lang: str, prefix: str) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(text="MD", callback_data=f"{prefix}:md"),
+            InlineKeyboardButton(text="TXT", callback_data=f"{prefix}:txt"),
+            InlineKeyboardButton(text="DOCX", callback_data=f"{prefix}:docx"),
+            InlineKeyboardButton(text="PDF", callback_data=f"{prefix}:pdf"),
+        ],
+        [InlineKeyboardButton(text=t(lang, "menu.back"), callback_data="nav:main")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def main_menu_kb(
     lang: str,
     with_referrals: bool = True,
@@ -27,6 +40,7 @@ def main_menu_kb(
 ) -> ReplyKeyboardMarkup:
     rows: list[list[KeyboardButton]] = [
         [KeyboardButton(text=t(lang, "menu.start_work"))],
+        [KeyboardButton(text=t(lang, "menu.coursework")), KeyboardButton(text=t(lang, "menu.file_answer"))],
         [KeyboardButton(text=t(lang, "menu.upgrade")), KeyboardButton(text=t(lang, "menu.account"))],
         [KeyboardButton(text=t(lang, "menu.settings")), KeyboardButton(text=t(lang, "menu.help"))],
     ]
